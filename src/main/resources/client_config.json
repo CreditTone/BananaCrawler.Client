@@ -1,0 +1,6 @@
+{
+	"master":{
+		"host":"localhost",
+		"port":8666
+	}
+}
