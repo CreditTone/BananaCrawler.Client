@@ -114,21 +114,24 @@ public class Command {
 					task.synchronizeLinks = true;
 				}
 			}
+			System.out.println("正在提交中......");
 			CommandResponse response = remoteMaster.submitTask(task);
 			if (response.success){
 				TaskStatus status = remoteMaster.taskStatus(task);
-				System.out.println("task infos:");
 				System.out.println("taskname:" + status.name);
 				System.out.println("id:" + status.id);
+				System.out.println("filer:" + task.filter);
+				System.out.println("queue suport_priority:" + (task.queue.get("suport_priority")!=null?task.queue.get("suport_priority"):false) + " delay:"+(task.queue.get("delay")!=null?task.queue.get("delay"):0));
+				System.out.println("processor count:" + task.processors.size());
+				if (task.timer != null){
+					System.out.println("timer first_start:" + task.timer.first_start +" period:"+task.timer.period);
+				}
 				System.out.println("stat:" + status.stat.toString());
-				if (!status.downloaderTrackerStatus.isEmpty()){
-					System.out.println("downloader tracker infos:");
-					for (DownloaderTrackerStatus dts : status.downloaderTrackerStatus) {
-						System.out.println("=========" + "downloader tracker" + "=========");
-						System.out.println("owner:" + dts.owner);
-						System.out.println("thread:" + dts.thread);
-						System.out.println("stat:" + dts.stat);
-					}
+				for (DownloaderTrackerStatus dts : status.downloaderTrackerStatus) {
+					System.out.println("=========" + "downloader tracker" + "=========");
+					System.out.println("owner:" + dts.owner);
+					System.out.println("thread:" + dts.thread);
+					System.out.println("stat:" + dts.stat);
 				}
 			}else{
 				System.out.println(response.error);
