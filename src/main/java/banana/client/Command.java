@@ -31,6 +31,7 @@ public class Command {
 		options.addOption("c", "config", true, "config file path");
 		options.addOption("s", "submit", true, "submit task from a jsonfile");
 		options.addOption("st", "stoptask", true, "stop a task");
+		options.addOption("ct", "continue", false, "continue a task");
 		options.addOption("sc", "stopcluster", false, "stop all task and cluster");
 		CommandLine commandLine = parser.parse(options, args);
 		HelpFormatter formatter = new HelpFormatter();
@@ -53,88 +54,69 @@ public class Command {
 		MasterProtocol remoteMaster = (MasterProtocol) RPC.getProxy(MasterProtocol.class, MasterProtocol.versionID,
 				new InetSocketAddress(config.master.host, config.master.port), new Configuration());
 		if (commandLine.hasOption("st")) {
-			String taskname = commandLine.getOptionValue("st");
-			CommandResponse response = remoteMaster.stopTask(taskname);
+			String taskid = commandLine.getOptionValue("st");
+			CommandResponse response = remoteMaster.stopTaskById(taskid);
 			if (response.success) {
-				System.out.println(taskname + " stoped");
+				System.out.println(taskid + " stoped");
 			} else {
-				System.out.println(taskname + " not existd");
+				System.out.println(taskid + " not existd");
 			}
 			return;
 		}
 		if (commandLine.hasOption("sc")) {
 			try {
 				remoteMaster.stopCluster();
-			} catch (Exception e) {
-			}
+			} catch (Exception e) {}
 			System.out.println("cluster stoped");
 			return;
 		}
 		Scanner scan = new Scanner(System.in);
 		// submit是提交任务
-		if (commandLine.hasOption('s')) {
-			String taskFilePath = commandLine.getOptionValue('s');
-			Task task = JSON.parseObject(FileUtils.readFileToString(new File(taskFilePath), "UTF-8"), Task.class);
-			task.verify();
-			TaskStatus taskStatus = remoteMaster.taskStatus(task);
-			if (taskStatus.stat == TaskStatus.Stat.Runing) {
-				System.out.print("任务" + task.name + "已经在运行，是否对" + task.name + "任务配置进行更新?\n确认请输入 y/yes:");
-				String yes = scan.next();
-				if (!yes.equalsIgnoreCase("Y") && !yes.equalsIgnoreCase("YES")) {
-					System.out.println("Task to submit cancel.");
-					return;
+		if (commandLine.hasOption('s') || commandLine.hasOption("continue")) {
+			Task task = null;
+			if (commandLine.hasOption('s')){
+				String taskFilePath = commandLine.getOptionValue('s');
+				task = JSON.parseObject(FileUtils.readFileToString(new File(taskFilePath), "UTF-8"), Task.class);
+			}else{
+				String taskFilePath = commandLine.getOptionValue("continue");
+				task = JSON.parseObject(FileUtils.readFileToString(new File(taskFilePath), "UTF-8"), Task.class);
+				if (task.allow_multi_task){
+					throw new Exception("多任务模式不允许共享任务状态");
 				}
+				task.synchronizeLinks = true;
 			}
-			if (taskStatus.dataCount > 0) {
-				System.out.print("集合" + task.collection + "下，taskname为" + task.name + "已经有" + taskStatus.dataCount + "条数据,");
-				System.out.print("是否要删除?\n确认请输入 y/yes:");
-				String yes = scan.next();
-				if (yes.equalsIgnoreCase("Y") || yes.equalsIgnoreCase("YES")) {
-					String password = null;
-					for (int i = 0; i < 3; i++) {
-						System.out.print("password:");
-						password = scan.next();
-						if (remoteMaster.verifyPassword(password).get()) {
-							int n = remoteMaster.removeBeforeResult(task.collection, task.name).get();
-							System.out.println("Delete article " + n);
-							break;
-						} else {
-							System.out.println("password error.");
-							if (i == 3) {
-								return;
-							}
+			task.verify();
+			System.out.println("submit......");
+			CommandResponse response = remoteMaster.submitTask(task);
+			if (response.success){
+				if (response.msg.length() > 0){
+					TaskStatus status = remoteMaster.getTaskStatusById(response.msg);
+					System.out.println("taskname:" + status.name);
+					System.out.println("id:" + status.id);
+					System.out.println("filer:" + task.filter);
+					System.out.println("queue suport_priority:" + (task.queue.get("suport_priority")!=null?task.queue.get("suport_priority"):false) + " delay:"+(task.queue.get("delay")!=null?task.queue.get("delay"):0));
+					System.out.println("processor count:" + task.processors.size());
+					if (task.mode != null){
+						System.out.println("mode:" + JSON.toJSONString(task.mode));
+					}
+					System.out.println("stat:" + status.stat.toString());
+					for (DownloaderTrackerStatus dts : status.downloaderTrackerStatus) {
+						System.out.println("=========" + "downloader tracker" + "=========");
+						System.out.println("owner:" + dts.owner);
+						System.out.println("thread:" + dts.thread);
+						System.out.println("stat:" + dts.stat);
+					}
+				}else{
+					if (task.mode != null){
+						System.out.println("queue suport_priority:" + (task.queue.get("suport_priority")!=null?task.queue.get("suport_priority"):false) + " delay:"+(task.queue.get("delay")!=null?task.queue.get("delay"):0));
+						System.out.println("filer:" + task.filter);
+						if (task.mode != null){
+							System.out.println("mode:" + JSON.toJSONString(task.mode));
 						}
 					}
 				}
-			}
-			if (taskStatus.requestCount > 0){
-				System.out.print("系统检测到上次还有一些requests是否加载上次剩余的requests?\n确认请输入 y/yes:");
-				String yes = scan.next();
-				if (yes.equalsIgnoreCase("Y") || yes.equalsIgnoreCase("YES")) {
-					task.synchronizeLinks = true;
-				}
-			}
-			System.out.println("正在提交中......");
-			CommandResponse response = remoteMaster.submitTask(task);
-			if (response.success){
-				TaskStatus status = remoteMaster.taskStatus(task);
-				System.out.println("taskname:" + status.name);
-				System.out.println("id:" + status.id);
-				System.out.println("filer:" + task.filter);
-				System.out.println("queue suport_priority:" + (task.queue.get("suport_priority")!=null?task.queue.get("suport_priority"):false) + " delay:"+(task.queue.get("delay")!=null?task.queue.get("delay"):0));
-				System.out.println("processor count:" + task.processors.size());
-				if (task.timer != null){
-					System.out.println("timer first_start:" + task.timer.first_start +" period:"+task.timer.period);
-				}
-				System.out.println("stat:" + status.stat.toString());
-				for (DownloaderTrackerStatus dts : status.downloaderTrackerStatus) {
-					System.out.println("=========" + "downloader tracker" + "=========");
-					System.out.println("owner:" + dts.owner);
-					System.out.println("thread:" + dts.thread);
-					System.out.println("stat:" + dts.stat);
-				}
 			}else{
-				System.out.println(response.error);
+				System.out.println("error:"+response.msg);
 			}
 		}
 	}
