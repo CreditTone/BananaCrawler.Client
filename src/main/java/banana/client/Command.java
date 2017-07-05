@@ -16,10 +16,10 @@ import org.apache.hadoop.ipc.RPC;
 import com.alibaba.fastjson.JSON;
 
 import banana.core.modle.CommandResponse;
+import banana.core.modle.Task;
 import banana.core.modle.TaskStatus;
 import banana.core.modle.TaskStatus.DownloaderTrackerStatus;
 import banana.core.protocol.MasterProtocol;
-import banana.core.protocol.Task;
 
 public class Command {
 
