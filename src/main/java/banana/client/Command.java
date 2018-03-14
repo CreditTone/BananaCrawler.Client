@@ -31,7 +31,7 @@ public class Command {
 		options.addOption("c", "config", true, "config file path");
 		options.addOption("s", "submit", true, "submit task from a jsonfile");
 		options.addOption("st", "stoptask", true, "stop a task");
-		options.addOption("ct", "continue", false, "continue a task");
+		options.addOption("ct", "continue", true, "continue a task");
 		options.addOption("sc", "stopcluster", false, "stop all task and cluster");
 		CommandLine commandLine = parser.parse(options, args);
 		HelpFormatter formatter = new HelpFormatter();
@@ -78,7 +78,8 @@ public class Command {
 				String taskFilePath = commandLine.getOptionValue('s');
 				task = JSON.parseObject(FileUtils.readFileToString(new File(taskFilePath), "UTF-8"), Task.class);
 			}else{
-				String taskFilePath = commandLine.getOptionValue("continue");
+				String taskFilePath = commandLine.getOptionValue("ct");
+				System.out.println(taskFilePath);
 				task = JSON.parseObject(FileUtils.readFileToString(new File(taskFilePath), "UTF-8"), Task.class);
 				if (task.allow_multi_task){
 					throw new Exception("多任务模式不允许共享任务状态");
