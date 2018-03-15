@@ -27,12 +27,12 @@ public class Command {
 		args = (args == null || args.length == 0) ? new String[] {"-h"} : args;
 		CommandLineParser parser = new DefaultParser();
 		Options options = new Options();
-		options.addOption("h", "help", false, "print this usage information");
-		options.addOption("c", "config", true, "config file path");
-		options.addOption("s", "submit", true, "submit task from a jsonfile");
-		options.addOption("st", "stoptask", true, "stop a task");
-		options.addOption("ct", "continue", true, "continue a task");
-		options.addOption("sc", "stopcluster", false, "stop all task and cluster");
+		options.addOption("h", "help", false, "帮助");
+		options.addOption("c", "config", true, "指定client端配置文件");
+		options.addOption("s", "submit", true, "提交并启动一个任务");
+		options.addOption("st", "stoptask", true, "停止任务，保存状态");
+		options.addOption("sc", "stopcluster", false, "关闭集群");
+		options.addOption("rt", "reset", false, "重置启动任务不加载上次的状态");
 		CommandLine commandLine = parser.parse(options, args);
 		HelpFormatter formatter = new HelpFormatter();
 		if (commandLine.hasOption('h')) {
@@ -72,7 +72,7 @@ public class Command {
 		}
 		Scanner scan = new Scanner(System.in);
 		// submit是提交任务
-		if (commandLine.hasOption('s') || commandLine.hasOption("continue")) {
+		if (commandLine.hasOption('s')) {
 			Task task = null;
 			if (commandLine.hasOption('s')){
 				String taskFilePath = commandLine.getOptionValue('s');
@@ -84,7 +84,9 @@ public class Command {
 				if (task.allow_multi_task){
 					throw new Exception("多任务模式不允许共享任务状态");
 				}
-				task.synchronizeLinks = true;
+			}
+			if (commandLine.hasOption("reset")) {
+				task.reset = true;
 			}
 			task.verify();
 			System.out.println("submit......");
